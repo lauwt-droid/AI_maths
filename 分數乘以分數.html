@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>分數乘法視覺化教學</title>
+    <style>
+        :root {
+            --primary-color: #4F46E5;
+            --secondary-color: #F59E0B;
+            --bg-color: #F3F4F6;
+            --card-bg: #FFFFFF;
+            --text-color: #1F2937;
+        }
+
+        body {
+            font-family: 'Noto Sans TC', "Microsoft JhengHei", sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            margin: 0;
+            min-height: 100vh;
+        }
+
+        h1 {
+            color: var(--primary-color);
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 1.1rem;
+            text-align: center;
+        }
+
+        .main-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 30px;
+            justify-content: center;
+            align-items: flex-start;
+            max-width: 1000px;
+            width: 100%;
+        }
+
+        /* Controls Section */
+        .controls-panel {
+            background: var(--card-bg);
+            padding: 25px;
+            border-radius: 16px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            flex: 1;
+            min-width: 300px;
+        }
+
+        .fraction-control {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .fraction-control:last-child {
+            border-bottom: none;
+        }
+
+        .fraction-label {
+            font-weight: bold;
+            font-size: 1.2rem;
+            width: 80px;
+        }
+
+        .fraction-input {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .input-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        button {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border: none;
+            background-color: #E5E7EB;
+            font-size: 1.2rem;
+            cursor: pointer;
+            transition: background 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        button:hover {
+            background-color: #D1D5DB;
+        }
+
+        button:active {
+            transform: scale(0.95);
+        }
+
+        .value-display {
+            font-size: 1.5rem;
+            font-weight: bold;
+            width: 30px;
+            text-align: center;
+        }
+
+        .fraction-line {
+            width: 100%;
+            height: 2px;
+            background-color: #000;
+            margin: 5px 0;
+        }
+
+        .color-indicator {
+            width: 15px;
+            height: 15px;
+            border-radius: 4px;
+            display: inline-block;
+            margin-right: 5px;
+        }
+
+        /* Visualization Section */
+        .visual-panel {
+            background: var(--card-bg);
+            padding: 25px;
+            border-radius: 16px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            flex: 1;
+            min-width: 340px;
+        }
+
+        #canvas-container {
+            width: 300px;
+            height: 300px;
+            margin-bottom: 20px;
+            position: relative;
+        }
+
+        svg {
+            width: 100%;
+            height: 100%;
+            border: 2px solid #333;
+            border-radius: 4px;
+            background: white;
+        }
+
+        .math-equation {
+            font-size: 2rem;
+            margin-top: 10px;
+            font-family: 'Courier New', Courier, monospace;
+            background: #f8fafc;
+            padding: 15px 30px;
+            border-radius: 10px;
+            border: 1px dashed #cbd5e1;
+        }
+
+        .fraction-inline {
+            display: inline-block;
+            vertical-align: middle;
+            text-align: center;
+            font-size: 1.2rem;
+        }
+        
+        .fraction-inline span {
+            display: block;
+        }
+        
+        .fraction-inline .top {
+            border-bottom: 2px solid currentColor;
+        }
+
+        .explanation {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #ecfdf5;
+            border-left: 5px solid #10b981;
+            border-radius: 4px;
+            line-height: 1.6;
+        }
+
+        /* SVG Animation Classes */
+        rect {
+            transition: all 0.4s ease;
+        }
+
+        .text-highlight {
+            font-weight: bold;
+            color: #059669;
+        }
+
+        @media (max-width: 768px) {
+            .main-container {
+                flex-direction: column;
+            }
+            
+            .controls-panel, .visual-panel {
+                width: 100%;
+                box-sizing: border-box;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <h1>分數乘法圖解實驗室</h1>
+    <div class="subtitle">透過重疊方塊，輕鬆理解分數相乘的原理</div>
+
+    <div class="main-container">
+        <!-- Control Panel -->
+        <div class="controls-panel">
+            <h3>設定分數</h3>
+            
+            <!-- Fraction A Control -->
+            <div class="fraction-control">
+                <div>
+                    <div class="fraction-label" style="color: #3B82F6;">
+                        <span class="color-indicator" style="background: #93C5FD;"></span>分數 A
+                    </div>
+                    <div style="font-size: 0.9rem; color: #666;">垂直切割</div>
+                </div>
+                <div class="fraction-input">
+                    <!-- Numerator A -->
+                    <div class="input-group">
+                        <button onclick="changeValue('numA', -1)">-</button>
+                        <span id="display-numA" class="value-display">1</span>
+                        <button onclick="changeValue('numA', 1)">+</button>
+                    </div>
+                    <div class="fraction-line"></div>
+                    <!-- Denominator A -->
+                    <div class="input-group">
+                        <button onclick="changeValue('denA', -1)">-</button>
+                        <span id="display-denA" class="value-display">2</span>
+                        <button onclick="changeValue('denA', 1)">+</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Fraction B Control -->
+            <div class="fraction-control">
+                <div>
+                    <div class="fraction-label" style="color: #D97706;">
+                        <span class="color-indicator" style="background: #FCD34D;"></span>分數 B
+                    </div>
+                    <div style="font-size: 0.9rem; color: #666;">水平切割</div>
+                </div>
+                <div class="fraction-input">
+                    <!-- Numerator B -->
+                    <div class="input-group">
+                        <button onclick="changeValue('numB', -1)">-</button>
+                        <span id="display-numB" class="value-display">1</span>
+                        <button onclick="changeValue('numB', 1)">+</button>
+                    </div>
+                    <div class="fraction-line"></div>
+                    <!-- Denominator B -->
+                    <div class="input-group">
+                        <button onclick="changeValue('denB', -1)">-</button>
+                        <span id="display-denB" class="value-display">3</span>
+                        <button onclick="changeValue('denB', 1)">+</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="explanation" id="text-explanation">
+                <!-- Dynamic explanation will go here -->
+            </div>
+        </div>
+
+        <!-- Visualization Panel -->
+        <div class="visual-panel">
+            <div id="canvas-container">
+                <svg id="main-svg" viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
+                    <!-- Dynamic Content will be injected here via JS -->
+                </svg>
+            </div>
+
+            <div class="math-equation" id="equation-display">
+                <!-- Equation goes here -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // State variables
+        let state = {
+            numA: 1, // Numerator A
+            denA: 2, // Denominator A
+            numB: 1, // Numerator B
+            denB: 3  // Denominator B
+        };
+
+        // Constants
+        const SVG_SIZE = 300;
+        const COLOR_A = "rgba(59, 130, 246, 0.5)"; // Blue with transparency
+        const COLOR_B = "rgba(245, 158, 11, 0.5)"; // Yellow/Orange with transparency
+        const COLOR_OVERLAP = "rgba(16, 185, 129, 0.8)"; // Green for overlap
+        const STROKE_COLOR = "#666";
+
+        function init() {
+            draw();
+        }
+
+        function changeValue(key, delta) {
+            let newVal = state[key] + delta;
+            
+            // Logic guards
+            if (key.startsWith('den')) {
+                // Denominator logic: min 1, max 10
+                if (newVal < 1) newVal = 1;
+                if (newVal > 10) newVal = 10;
+                
+                // If denominator drops below numerator, adjust numerator
+                let correspondingNumKey = 'num' + key.slice(-1);
+                if (state[correspondingNumKey] > newVal) {
+                    state[correspondingNumKey] = newVal;
+                    document.getElementById('display-' + correspondingNumKey).innerText = newVal;
+                }
+            } else {
+                // Numerator logic: min 0, max denominator
+                let correspondingDenKey = 'den' + key.slice(-1);
+                if (newVal < 0) newVal = 0;
+                if (newVal > state[correspondingDenKey]) newVal = state[correspondingDenKey];
+            }
+
+            state[key] = newVal;
+            document.getElementById('display-' + key).innerText = newVal;
+            draw();
+        }
+
+        function draw() {
+            const svg = document.getElementById('main-svg');
+            svg.innerHTML = ''; // Clear SVG
+
+            // 1. Draw Grid Lines (Background reference) & Fills
+            // We are drawing a Area Model.
+            // Fraction A is Vertical slices
+            // Fraction B is Horizontal slices
+
+            const widthPerUnitA = SVG_SIZE / state.denA;
+            const heightPerUnitB = SVG_SIZE / state.denB;
+
+            // Group for Vertical Strips (Fraction A)
+            const groupA = document.createElementNS("http://www.w3.org/2000/svg", "g");
+            for (let i = 0; i < state.denA; i++) {
+                const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+                rect.setAttribute("x", i * widthPerUnitA);
+                rect.setAttribute("y", 0);
+                rect.setAttribute("width", widthPerUnitA);
+                rect.setAttribute("height", SVG_SIZE);
+                rect.setAttribute("stroke", STROKE_COLOR);
+                rect.setAttribute("stroke-width", "1");
+                
+                if (i < state.numA) {
+                    rect.setAttribute("fill", COLOR_A);
+                } else {
+                    rect.setAttribute("fill", "none");
+                }
+                groupA.appendChild(rect);
+            }
+            svg.appendChild(groupA);
+
+            // Group for Horizontal Strips (Fraction B)
+            // We need to overlay these. 
+            const groupB = document.createElementNS("http://www.w3.org/2000/svg", "g");
+            for (let j = 0; j < state.denB; j++) {
+                const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+                rect.setAttribute("x", 0);
+                // Draw from bottom up or top down? Standard Cartesian is usually bottom up for graphs, 
+                // but matrices/web is top down. Let's stick to Top-Down for simplicity.
+                rect.setAttribute("y", j * heightPerUnitB);
+                rect.setAttribute("width", SVG_SIZE);
+                rect.setAttribute("height", heightPerUnitB);
+                rect.setAttribute("stroke", STROKE_COLOR);
+                rect.setAttribute("stroke-width", "1");
+
+                if (j < state.numB) {
+                    rect.setAttribute("fill", COLOR_B);
+                } else {
+                    rect.setAttribute("fill", "none");
+                }
+                groupB.appendChild(rect);
+            }
+            svg.appendChild(groupB);
+
+            // 2. Highlight the Overlap (Intersection) explicitly for clarity
+            // The overlap area is (0,0) to (numA * widthUnit, numB * heightUnit)
+            if (state.numA > 0 && state.numB > 0) {
+                const overlapRect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+                overlapRect.setAttribute("x", 0);
+                overlapRect.setAttribute("y", 0);
+                overlapRect.setAttribute("width", state.numA * widthPerUnitA);
+                overlapRect.setAttribute("height", state.numB * heightPerUnitB);
+                // Using a blend or a specific color for the result
+                overlapRect.setAttribute("fill", "url(#diagonalHatch)"); // Pattern or color? Let's use color + opacity
+                overlapRect.setAttribute("fill", "rgba(16, 185, 129, 0.6)"); // Stronger green
+                overlapRect.setAttribute("stroke", "#065F46");
+                overlapRect.setAttribute("stroke-width", "3");
+                
+                // Add simple animation
+                const animate = document.createElementNS("http://www.w3.org/2000/svg", "animate");
+                animate.setAttribute("attributeName", "opacity");
+                animate.setAttribute("from", "0");
+                animate.setAttribute("to", "1");
+                animate.setAttribute("dur", "0.5s");
+                animate.setAttribute("fill", "freeze");
+                overlapRect.appendChild(animate);
+
+                svg.appendChild(overlapRect);
+            }
+            
+            // Draw outer border
+            const border = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+            border.setAttribute("x", 0);
+            border.setAttribute("y", 0);
+            border.setAttribute("width", SVG_SIZE);
+            border.setAttribute("height", SVG_SIZE);
+            border.setAttribute("fill", "none");
+            border.setAttribute("stroke", "#000");
+            border.setAttribute("stroke-width", "2");
+            svg.appendChild(border);
+
+            updateText();
+        }
+
+        function updateText() {
+            const resultNum = state.numA * state.numB;
+            const resultDen = state.denA * state.denB;
+
+            // Generate HTML for equation
+            const eqDiv = document.getElementById('equation-display');
+            eqDiv.innerHTML = `
+                <div class="fraction-inline" style="color: #2563EB">
+                    <span class="top">${state.numA}</span>
+                    <span>${state.denA}</span>
+                </div>
+                <span> × </span>
+                <div class="fraction-inline" style="color: #D97706">
+                    <span class="top">${state.numB}</span>
+                    <span>${state.denB}</span>
+                </div>
+                <span> = </span>
+                <div class="fraction-inline" style="color: #059669">
+                    <span class="top">${resultNum}</span>
+                    <span>${resultDen}</span>
+                </div>
+            `;
+
+            // Generate Explanation
+            const expDiv = document.getElementById('text-explanation');
+            expDiv.innerHTML = `
+                <p><strong>觀察重點：</strong></p>
+                <ul style="padding-left: 20px; margin: 5px 0;">
+                    <li>整個大正方形被切成了 <span class="text-highlight">${state.denA} × ${state.denB} = ${resultDen}</span> 個小格子（新的分母）。</li>
+                    <li>雙重顏色（綠色）重疊的部分有 <span class="text-highlight">${state.numA} × ${state.numB} = ${resultNum}</span> 個小格子（新的分子）。</li>
+                </ul>
+                <p style="margin-top:10px; font-size: 0.95rem;">這就是為什麼分數相乘時：<br>分子乘分子，分母乘分母。</p>
+            `;
+        }
+
+        // Initialize on load
+        window.onload = init;
+
+    </script>
+</body>
+</html>
