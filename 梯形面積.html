@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>梯形面積公式原理 - 動畫演示版</title>
+    <style>
+        :root {
+            --primary-color: #4a90e2;  /* 藍色 (原圖) */
+            --copy-color: #f5a623;     /* 橘色 (複製圖) */
+            --height-color: #417505;   /* 綠色 (高) */
+            --text-color: #333;
+            --bg-color: #f0f4f8;
+            --panel-bg: #ffffff;
+        }
+
+        body {
+            font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            touch-action: none;
+        }
+
+        h1 {
+            color: var(--primary-color);
+            margin: 10px 0;
+            font-size: 1.5rem;
+            text-align: center;
+        }
+
+        .container {
+            background-color: var(--panel-bg);
+            border-radius: 20px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            padding: 15px;
+            max-width: 850px;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            box-sizing: border-box;
+        }
+
+        /* SVG Stage */
+        .stage-container {
+            width: 100%;
+            height: 360px;
+            background-color: #ffffff;
+            border-radius: 15px;
+            border: 2px solid #e2e8f0;
+            position: relative;
+            overflow: hidden;
+            margin-bottom: 15px;
+            user-select: none;
+        }
+
+        svg {
+            width: 100%;
+            height: 100%;
+            overflow: visible; /* 允許圖形稍微超出邊界 */
+        }
+
+        /* Shape Styles */
+        .trapezoid-main {
+            fill: rgba(74, 144, 226, 0.15);
+            stroke: var(--primary-color);
+            stroke-width: 3;
+            stroke-linejoin: round;
+        }
+
+        .trapezoid-copy {
+            fill: rgba(245, 166, 35, 0.2); /* 橘色填充 */
+            stroke: var(--copy-color);
+            stroke-width: 3;
+            stroke-linejoin: round;
+            transition: opacity 0.5s ease-in;
+        }
+
+        /* Group Transition for Rotation */
+        #trapCopyGroup {
+            transition: transform 1.5s cubic-bezier(0.4, 0.0, 0.2, 1);
+            opacity: 0; 
+            pointer-events: none;
+        }
+
+        #trapCopyGroup.visible {
+            opacity: 1;
+        }
+
+        .label-text {
+            font-size: 16px;
+            font-weight: bold;
+            fill: #555;
+            text-anchor: middle;
+            dominant-baseline: middle;
+            pointer-events: none;
+            text-shadow: 2px 2px 0px white, -2px -2px 0px white, 2px -2px 0px white, -2px 2px 0px white;
+            transition: transform 1.5s; 
+        }
+        
+        .label-copy {
+            fill: #d35400; 
+        }
+
+        .counter-rotate {
+            transform-box: fill-box; 
+            transform-origin: center;
+            transform: rotate(180deg); 
+        }
+
+        /* Handles */
+        .handle {
+            fill: #fff;
+            stroke-width: 3;
+            r: 10;
+            cursor: grab;
+            transition: r 0.2s;
+            filter: drop-shadow(0 2px 3px rgba(0,0,0,0.2));
+            z-index: 10;
+        }
+        .handle:hover { r: 12; }
+        .handle:active { cursor: grabbing; r: 12; }
+        
+        .handle-a { stroke: #d0021b; }
+        .handle-b { stroke: #4a90e2; }
+        .handle-h { stroke: #417505; }
+
+        /* Controls Area */
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            width: 100%;
+            margin-bottom: 15px;
+            padding: 10px;
+            background: #fafafa;
+            border-radius: 10px;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .control-group label {
+            font-size: 0.9rem;
+            font-weight: bold;
+            margin-bottom: 5px;
+            white-space: nowrap;
+        }
+
+        .value-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 10px;
+            background: #eee;
+            min-width: 30px;
+            text-align: center;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            max-width: 120px;
+            height: 6px;
+            background: #ddd;
+            border-radius: 5px;
+            outline: none;
+            -webkit-appearance: none;
+            margin-top: 5px;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: var(--primary-color);
+            cursor: pointer;
+        }
+
+        /* Action Buttons */
+        .actions {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            margin-bottom: 15px;
+        }
+
+        .btn {
+            padding: 12px 30px;
+            border: none;
+            border-radius: 50px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s;
+        }
+        .btn:active { transform: scale(0.95); }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #f5a623, #e67e22);
+            color: white;
+            box-shadow: 0 4px 15px rgba(245, 166, 35, 0.4);
+        }
+        
+        .btn-reset {
+            background: #e2e8f0;
+            color: #4a5568;
+        }
+
+        /* Explanation Box */
+        .explanation-box {
+            background-color: #fff8e1;
+            border-left: 5px solid var(--copy-color);
+            padding: 15px;
+            border-radius: 8px;
+            width: 100%;
+            font-size: 1.1rem;
+            line-height: 1.6;
+            box-sizing: border-box;
+        }
+
+        .formula {
+            font-size: 1.3em;
+            text-align: center;
+            margin-top: 10px;
+            padding: 10px;
+            background: rgba(255,255,255,0.6);
+            border-radius: 8px;
+        }
+
+        .color-a { color: #d0021b; font-weight: bold; }
+        .color-b { color: #4a90e2; font-weight: bold; }
+        .color-h { color: #417505; font-weight: bold; }
+        
+        .math-frac {
+            display: inline-block;
+            vertical-align: middle;
+            text-align: center;
+            margin: 0 5px;
+        }
+        .math-frac span { display: block; }
+        .math-frac .top { border-bottom: 2px solid #333; padding-bottom: 2px; }
+
+        @media (max-width: 600px) {
+            .controls { grid-template-columns: 1fr; gap: 15px; }
+            input[type="range"] { max-width: 100%; }
+            h1 { font-size: 1.2rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <h1>梯形面積公式原理</h1>
+
+    <div class="container">
+        <div class="stage-container" id="stage">
+            <!-- Increased ViewBox width to accommodate the full parallelogram -->
+            <svg id="mainSvg" viewBox="0 0 800 360" preserveAspectRatio="xMidYMid meet">
+                <!-- Groups -->
+                
+                <!-- 1. Main Trapezoid (Blue) -->
+                <g id="mainGroup">
+                    <path id="trapMain" class="trapezoid-main" d="" />
+                    <!-- Dimensions Lines -->
+                    <line id="lineHeight" stroke="#417505" stroke-width="2" stroke-dasharray="5,3" />
+                    <!-- Text Labels -->
+                    <text id="labelA" class="label-text color-a">上底</text>
+                    <text id="labelB" class="label-text color-b">下底</text>
+                    <text id="labelH" class="label-text color-h">高</text>
+                </g>
+
+                <!-- 2. Copy Trapezoid (Orange) - Initially Hidden -->
+                <g id="trapCopyGroup">
+                    <path id="trapCopy" class="trapezoid-copy" d="" />
+                    <!-- New: Height Line for Copy -->
+                    <line id="copyLineHeight" stroke="#d35400" stroke-width="2" stroke-dasharray="5,3" />
+                    
+                    <!-- Copy Text Labels (Will move with the group) -->
+                    <text id="copyLabelA" class="label-text label-copy">上底</text>
+                    <text id="copyLabelB" class="label-text label-copy">下底</text>
+                    <text id="copyLabelH" class="label-text label-copy">高</text>
+                </g>
+
+                <!-- 3. Handles & Pivot (On Top) -->
+                <g id="handlesGroup">
+                    <circle id="handleA" class="handle handle-a" cx="0" cy="0" />
+                    <circle id="handleB" class="handle handle-b" cx="0" cy="0" />
+                    <circle id="handleH" class="handle handle-h" cx="0" cy="0" />
+                    <!-- Pivot Point Visualization -->
+                    <circle id="pivotPoint" r="4" fill="#333" opacity="0" />
+                </g>
+            </svg>
+        </div>
+
+        <div class="actions">
+            <button class="btn btn-primary" onclick="toggleAnimation()" id="animBtn">
+                <i class="fa-solid fa-wand-magic-sparkles"></i> 演示
+            </button>
+        </div>
+
+        <div class="controls">
+            <div class="control-group">
+                <label class="color-a">上底: <span id="valA" class="value-badge">4</span></label>
+                <input type="range" id="inputA" min="2" max="9" step="1" value="4" oninput="updateFromSlider()">
+            </div>
+            <div class="control-group">
+                <label class="color-b">下底: <span id="valB" class="value-badge">6</span></label>
+                <input type="range" id="inputB" min="2" max="12" step="1" value="6" oninput="updateFromSlider()">
+            </div>
+            <div class="control-group">
+                <label class="color-h">高: <span id="valH" class="value-badge">4</span></label>
+                <input type="range" id="inputH" min="2" max="7" step="1" value="4" oninput="updateFromSlider()">
+            </div>
+        </div>
+
+        <div class="explanation-box" id="explanation">
+            拖曳圖形上的<strong>圓點</strong>改變大小，點擊按鈕觀看動畫。<br>
+            梯形面積 = <span class="math-frac"><span class="top">(上底 + 下底) × 高</span><span>2</span></span>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        const SCALE = 35; // Scale slightly reduced to fit wider shape
+        const CX = 350;   // Shift center slightly left within 800px view
+        const BASE_Y = 300; 
+
+        // State
+        let state = {
+            a: 4,
+            b: 6,
+            h: 4,
+            isTransformed: false,
+            dragging: null 
+        };
+
+        // DOM Elements
+        const els = {
+            svg: document.getElementById('mainSvg'),
+            
+            // Main Shape
+            trapMain: document.getElementById('trapMain'),
+            labelA: document.getElementById('labelA'),
+            labelB: document.getElementById('labelB'),
+            labelH: document.getElementById('labelH'),
+            lineH: document.getElementById('lineHeight'),
+
+            // Copy Shape
+            trapCopyGroup: document.getElementById('trapCopyGroup'),
+            trapCopy: document.getElementById('trapCopy'),
+            copyLineHeight: document.getElementById('copyLineHeight'), // New line
+            copyLabelA: document.getElementById('copyLabelA'),
+            copyLabelB: document.getElementById('copyLabelB'),
+            copyLabelH: document.getElementById('copyLabelH'),
+
+            // Pivot
+            pivot: document.getElementById('pivotPoint'),
+
+            // Inputs & Displays
+            inputA: document.getElementById('inputA'),
+            inputB: document.getElementById('inputB'),
+            inputH: document.getElementById('inputH'),
+            valA: document.getElementById('valA'),
+            valB: document.getElementById('valB'),
+            valH: document.getElementById('valH'),
+            
+            // Handles
+            handleA: document.getElementById('handleA'),
+            handleB: document.getElementById('handleB'),
+            handleH: document.getElementById('handleH'),
+            handlesGroup: document.getElementById('handlesGroup'),
+            
+            // UI
+            explanation: document.getElementById('explanation'),
+            animBtn: document.getElementById('animBtn')
+        };
+
+        function init() {
+            addDragListeners();
+            draw();
+            updateExplanation();
+        }
+
+        function updateFromSlider() {
+            if (state.isTransformed) resetAnimation();
+            state.a = parseInt(els.inputA.value);
+            state.b = parseInt(els.inputB.value);
+            state.h = parseInt(els.inputH.value);
+            draw();
+            updateExplanation();
+        }
+
+        function draw() {
+            // Constraints
+            if (state.a < 1) state.a = 1;
+            if (state.b < 1) state.b = 1;
+            if (state.h < 1) state.h = 1;
+
+            const pxA = state.a * SCALE;
+            const pxB = state.b * SCALE;
+            const pxH = state.h * SCALE;
+
+            // Calculate Coordinates (Isosceles Trapezoid centered at CX)
+            const topY = BASE_Y - pxH;
+            
+            const p1 = { x: CX - pxA / 2, y: topY }; // Top Left
+            const p2 = { x: CX + pxA / 2, y: topY }; // Top Right
+            const p3 = { x: CX + pxB / 2, y: BASE_Y }; // Bottom Right
+            const p4 = { x: CX - pxB / 2, y: BASE_Y }; // Bottom Left
+
+            // Path String
+            const d = `M ${p1.x} ${p1.y} L ${p2.x} ${p2.y} L ${p3.x} ${p3.y} L ${p4.x} ${p4.y} Z`;
+            
+            // 1. Update Main Trapezoid
+            els.trapMain.setAttribute('d', d);
+            
+            // Height Line (Main) - Left side
+            els.lineH.setAttribute('x1', p1.x);
+            els.lineH.setAttribute('y1', p1.y);
+            els.lineH.setAttribute('x2', p1.x);
+            els.lineH.setAttribute('y2', p3.y);
+
+            // Main Labels
+            els.labelA.textContent = `上底 ${state.a}`;
+            els.labelA.setAttribute('x', CX);
+            els.labelA.setAttribute('y', topY - 15);
+
+            els.labelB.textContent = `下底 ${state.b}`;
+            els.labelB.setAttribute('x', CX);
+            els.labelB.setAttribute('y', BASE_Y + 25);
+
+            els.labelH.textContent = `高 ${state.h}`;
+            els.labelH.setAttribute('x', p1.x - 25);
+            els.labelH.setAttribute('y', topY + pxH / 2);
+
+
+            // 2. Update Copy Trapezoid
+            els.trapCopy.setAttribute('d', d);
+            
+            // Copy Height Line: Use same relative geometry as Main Height Line (Left side relative to shape)
+            // When rotated 180, this "Left side" becomes the "Right side" of the parallelogram
+            els.copyLineHeight.setAttribute('x1', p1.x);
+            els.copyLineHeight.setAttribute('y1', p1.y);
+            els.copyLineHeight.setAttribute('x2', p1.x);
+            els.copyLineHeight.setAttribute('y2', p3.y);
+
+            els.copyLabelA.textContent = `上底 ${state.a}`;
+            els.copyLabelA.setAttribute('x', CX);
+            els.copyLabelA.setAttribute('y', topY + 20); 
+
+            els.copyLabelB.textContent = `下底 ${state.b}`;
+            els.copyLabelB.setAttribute('x', CX);
+            els.copyLabelB.setAttribute('y', BASE_Y - 20); 
+
+            // Copy Height Label:
+            // Position it exactly like the Main Height label (Left of P1).
+            // When rotated, it will move to the far right, next to the copy height line.
+            els.copyLabelH.textContent = `高 ${state.h}`;
+            els.copyLabelH.setAttribute('x', p1.x - 25); 
+            els.copyLabelH.setAttribute('y', topY + pxH / 2);
+
+            // 3. Handles Positions
+            els.handleA.setAttribute('cx', p2.x);
+            els.handleA.setAttribute('cy', p2.y);
+
+            els.handleB.setAttribute('cx', p3.x);
+            els.handleB.setAttribute('cy', p3.y);
+
+            els.handleH.setAttribute('cx', CX);
+            els.handleH.setAttribute('cy', p1.y);
+
+            // 4. Pivot Point
+            const pivotX = (p2.x + p3.x) / 2;
+            const pivotY = (p2.y + p3.y) / 2;
+            
+            els.pivot.setAttribute('cx', pivotX);
+            els.pivot.setAttribute('cy', pivotY);
+            
+            // Set Transform Origin
+            els.trapCopyGroup.style.transformOrigin = `${pivotX}px ${pivotY}px`;
+
+            // Sync Inputs
+            els.inputA.value = state.a;
+            els.inputB.value = state.b;
+            els.inputH.value = state.h;
+            els.valA.textContent = state.a;
+            els.valB.textContent = state.b;
+            els.valH.textContent = state.h;
+        }
+
+        // Animation Logic
+        function toggleAnimation() {
+            if (state.isTransformed) {
+                resetAnimation();
+            } else {
+                startAnimation();
+            }
+        }
+
+        function startAnimation() {
+            state.isTransformed = true;
+            els.animBtn.innerHTML = "⏪ 重置";
+            els.animBtn.classList.add('btn-reset');
+            els.animBtn.classList.remove('btn-primary');
+            
+            els.handlesGroup.style.opacity = '0';
+            els.handlesGroup.style.pointerEvents = 'none';
+            
+            els.trapCopyGroup.classList.add('visible');
+
+            setTimeout(() => {
+                els.trapCopyGroup.style.transform = 'rotate(180deg)';
+                
+                // Counter-rotate text so it reads correctly
+                els.copyLabelA.classList.add('counter-rotate');
+                els.copyLabelB.classList.add('counter-rotate');
+                els.copyLabelH.classList.add('counter-rotate');
+
+            }, 600);
+
+            updateExplanation();
+        }
+
+        function resetAnimation() {
+            state.isTransformed = false;
+            els.animBtn.innerHTML = "演示";
+            els.animBtn.classList.remove('btn-reset');
+            els.animBtn.classList.add('btn-primary');
+            
+            els.trapCopyGroup.style.transform = 'rotate(0deg)';
+            els.trapCopyGroup.classList.remove('visible');
+            
+            els.copyLabelA.classList.remove('counter-rotate');
+            els.copyLabelB.classList.remove('counter-rotate');
+            els.copyLabelH.classList.remove('counter-rotate');
+            
+            els.handlesGroup.style.opacity = '1';
+            els.handlesGroup.style.pointerEvents = 'all';
+            
+            updateExplanation();
+        }
+
+        // Interaction Logic
+        function addDragListeners() {
+            els.handleA.addEventListener('mousedown', (e) => startDrag(e, 'a'));
+            els.handleB.addEventListener('mousedown', (e) => startDrag(e, 'b'));
+            els.handleH.addEventListener('mousedown', (e) => startDrag(e, 'h'));
+            
+            els.handleA.addEventListener('touchstart', (e) => startDrag(e, 'a'), {passive: false});
+            els.handleB.addEventListener('touchstart', (e) => startDrag(e, 'b'), {passive: false});
+            els.handleH.addEventListener('touchstart', (e) => startDrag(e, 'h'), {passive: false});
+
+            window.addEventListener('mousemove', drag);
+            window.addEventListener('mouseup', endDrag);
+            window.addEventListener('touchmove', drag, {passive: false});
+            window.addEventListener('touchend', endDrag);
+        }
+
+        function startDrag(e, type) {
+            if(state.isTransformed) return; 
+            e.preventDefault();
+            state.dragging = type;
+            els.handlesGroup.style.cursor = 'grabbing';
+        }
+
+        function drag(e) {
+            if (!state.dragging) return;
+            e.preventDefault();
+            const pt = els.svg.createSVGPoint();
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            pt.x = clientX;
+            pt.y = clientY;
+            const svgP = pt.matrixTransform(els.svg.getScreenCTM().inverse());
+            
+            if (state.dragging === 'a') {
+                let rawA = Math.abs(svgP.x - CX) * 2 / SCALE;
+                state.a = Math.max(2, Math.min(9, Math.round(rawA)));
+            } else if (state.dragging === 'b') {
+                let rawB = Math.abs(svgP.x - CX) * 2 / SCALE;
+                state.b = Math.max(2, Math.min(12, Math.round(rawB)));
+            } else if (state.dragging === 'h') {
+                let rawH = (BASE_Y - svgP.y) / SCALE;
+                state.h = Math.max(2, Math.min(7, Math.round(rawH)));
+            }
+            draw();
+            updateExplanation();
+        }
+
+        function endDrag() {
+            state.dragging = null;
+            els.handlesGroup.style.cursor = 'default';
+        }
+
+        function updateExplanation() {
+            if (!state.isTransformed) {
+                els.explanation.innerHTML = `
+                    <div style="text-align:center">
+                        <strong>目前的數值：</strong><br>
+                        上底 ${state.a}, 下底 ${state.b}, 高 ${state.h}
+                    </div>
+                `;
+            } else {
+                const totalBase = state.a + state.b;
+                els.explanation.innerHTML = `
+                    <strong>觀察平行四邊形：</strong><br>
+                    1. 它是由<strong>兩個</strong>完全一樣的梯形組成的。<br>
+                    2. 平行四邊形的底 = 藍色下底 + 橘色上底 = <span class="color-b">${state.b}</span> + <span class="color-a">${state.a}</span> = <strong>${totalBase}</strong>。<br>
+                    3. 梯形面積是平行四邊形的<strong>一半</strong>。<br>
+                    <div class="formula">
+                        梯形面積 = (上底 + 下底) × 高 ÷ 2
+                    </div>
+                `;
+            }
+        }
+
+        init();
+
+    </script>
+</body>
+</html>
