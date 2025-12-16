@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>角的小學堂 - 互動教學</title>
+    
+    <!-- 引入 Tailwind CSS (美化樣式) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- 引入 React 和 ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    
+    <!-- 引入 Babel (讓瀏覽器看懂 React 程式碼) -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- 自定義動畫樣式 -->
+    <style>
+        @keyframes bounce-short {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+        .animate-bounce-short { animation: bounce-short 0.5s infinite; }
+        
+        @keyframes fade-in {
+            from { opacity: 0; } to { opacity: 1; }
+        }
+        .animate-fade-in { animation: fade-in 0.3s ease-in-out; }
+        
+        @keyframes fade-in-up {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in-up { animation: fade-in-up 0.5s ease-out forwards; }
+    </style>
+</head>
+<body class="bg-yellow-50">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        // 取出 React 的功能
+        const { useState, useEffect, useRef } = React;
+
+        // --- 圖示組件 (SVG Icons) ---
+        const IconBase = ({ children, className }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                {children}
+            </svg>
+        );
+        const BookOpen = ({ className }) => <IconBase className={className}><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></IconBase>;
+        const RotateCcw = ({ className }) => <IconBase className={className}><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 12"/><path d="M3 5v7h7"/></IconBase>;
+        const PenTool = ({ className }) => <IconBase className={className}><path d="m12 19 7-7 3 3-7 7-3-3z"/><path d="m18 13-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="m2 2 7.586 7.586"/><circle cx="11" cy="11" r="2"/></IconBase>;
+        const Trophy = ({ className }) => <IconBase className={className}><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2l-7.95 8.94c-.78.88-2.14.88-2.92 0L2 2"/></IconBase>;
+        const Play = ({ className }) => <IconBase className={className}><polygon points="5 3 19 12 5 21 5 3"/></IconBase>;
+        const CheckCircle = ({ className }) => <IconBase className={className}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></IconBase>;
+        const XCircle = ({ className }) => <IconBase className={className}><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></IconBase>;
+        const Info = ({ className }) => <IconBase className={className}><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></IconBase>;
+        const RulerIcon = ({ className }) => <IconBase className={className}><path d="M21.3 15.3a2.4 2.4 0 0 1 0 3.4l-2.6 2.6a2.4 2.4 0 0 1-3.4 0L2.7 8.7a2.41 2.41 0 0 1 0-3.4l2.6-2.6a2.41 2.41 0 0 1 3.4 0l12.6 12.6z"/><line x1="13" y1="7" x2="14" y2="8"/><line x1="13" y1="3" x2="14" y2="4"/><line x1="9" y1="14" x2="10" y2="15"/><line x1="5" y1="10" x2="6" y2="11"/><line x1="17" y1="13" x2="18" y2="14"/></IconBase>;
+        const Undo2 = ({ className }) => <IconBase className={className}><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5v0a5.5 5.5 0 0 1-5.5 5.5H11"/></IconBase>;
+        const ArrowRight = ({ className }) => <IconBase className={className}><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></IconBase>;
+
+        // --- 顏色常數 ---
+        const COLORS = {
+            acute: { main: 'text-blue-500', bg: 'bg-blue-100', border: 'border-blue-500', fill: '#3b82f6' },
+            right: { main: 'text-orange-500', bg: 'bg-orange-100', border: 'border-orange-500', fill: '#f97316' },
+            obtuse: { main: 'text-green-500', bg: 'bg-green-100', border: 'border-green-500', fill: '#22c55e' },
+            neutral: { main: 'text-gray-600', bg: 'bg-white', border: 'border-gray-200', fill: '#9ca3af' }
+        };
+
+        // --- 主應用程式 ---
+        const App = () => {
+            const [activeTab, setActiveTab] = useState('draw');
+
+            return (
+                <div className="min-h-screen bg-yellow-50 font-sans text-gray-800 flex flex-col items-center">
+                    <header className="w-full bg-white shadow-md p-4 flex justify-center items-center z-10 sticky top-0">
+                        <h1 className="text-2xl md:text-3xl font-bold text-indigo-600 flex items-center gap-2">
+                            <BookOpen className="w-8 h-8" />
+                            角的小學堂
+                        </h1>
+                    </header>
+
+                    <div className="flex flex-wrap justify-center gap-2 md:gap-4 my-6 px-4">
+                        <NavButton id="explore" label="角度變變變" icon={<RotateCcw className="w-5 h-5" />} active={activeTab === 'explore'} onClick={setActiveTab} />
+                        <NavButton id="draw" label="方格紙畫角" icon={<PenTool className="w-5 h-5" />} active={activeTab === 'draw'} onClick={setActiveTab} />
+                        <NavButton id="quiz" label="挑戰小測驗" icon={<Trophy className="w-5 h-5" />} active={activeTab === 'quiz'} onClick={setActiveTab} />
+                    </div>
+
+                    <main className="w-full max-w-4xl px-4 pb-12 flex-grow">
+                        <div className="bg-white rounded-2xl shadow-xl p-6 md:p-8 min-h-[500px]">
+                            {activeTab === 'explore' && <AngleExplorer />}
+                            {activeTab === 'draw' && <GridDrawer />}
+                            {activeTab === 'quiz' && <AngleQuiz />}
+                        </div>
+                    </main>
+
+                    <footer className="text-gray-400 text-sm py-4">
+                        數學好好玩：認識銳角、直角與鈍角
+                    </footer>
+                </div>
+            );
+        };
+
+        const NavButton = ({ id, label, icon, active, onClick }) => (
+            <button
+                onClick={() => onClick(id)}
+                className={`flex items-center gap-2 px-6 py-3 rounded-full font-bold transition-all transform hover:scale-105 shadow-sm
+                    ${active ? 'bg-indigo-600 text-white shadow-indigo-300 ring-2 ring-indigo-200' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+            >
+                {icon}
+                {label}
+            </button>
+        );
+
+        // 1. Explore Mode
+        const AngleExplorer = () => {
+            const [angle, setAngle] = useState(45);
+            
+            const getAngleType = (deg) => {
+                if (deg === 90) return { type: '直角', color: COLORS.right, desc: '方方正正的角' };
+                if (deg < 90) return { type: '銳角', color: COLORS.acute, desc: '比直角小，尖尖的' };
+                return { type: '鈍角', color: COLORS.obtuse, desc: '比直角大，寬寬的' };
+            };
+
+            const info = getAngleType(angle);
+            const radius = 120;
+            const centerX = 150;
+            const centerY = 150;
+            const x1 = centerX + radius;
+            const y1 = centerY;
+            const radian = (angle * Math.PI) / 180;
+            const x2 = centerX + radius * Math.cos(-radian);
+            const y2 = centerY + radius * Math.sin(-radian);
+
+            return (
+                <div className="flex flex-col items-center">
+                    <h2 className="text-2xl font-bold mb-6 text-gray-700">拖動拉桿，觀察角的變化</h2>
+                    <div className="relative border-4 border-gray-100 rounded-xl p-4 mb-6 bg-white shadow-inner">
+                        <svg width="300" height="200" className="overflow-visible">
+                            <line x1={centerX} y1={centerY} x2={x1} y2={y1} stroke="#4b5563" strokeWidth="4" strokeLinecap="round" />
+                            <line x1={centerX} y1={centerY} x2={x2} y2={y2} stroke="#4b5563" strokeWidth="4" strokeLinecap="round" />
+                            <path d={`M ${centerX + 40} ${centerY} A 40 40 0 0 0 ${centerX + 40 * Math.cos(-radian)} ${centerY + 40 * Math.sin(-radian)}`}
+                                fill="none" stroke={info.color.fill} strokeWidth="3" strokeDasharray={angle === 90 ? "0" : "4,2"} />
+                            {angle === 90 && <rect x={centerX} y={centerY - 20} width="20" height="20" fill="none" stroke={info.color.fill} strokeWidth="2" />}
+                            <circle cx={centerX} cy={centerY} r="6" fill="#4f46e5" />
+                        </svg>
+                        <div className={`absolute top-2 right-2 px-3 py-1 rounded-lg border font-bold ${info.color.bg} ${info.color.main} ${info.color.border}`}>{angle}°</div>
+                    </div>
+                    <div className={`text-4xl font-extrabold mb-2 ${info.color.main} transition-colors duration-300`}>{info.type}</div>
+                    <p className="text-gray-500 mb-8 text-lg">{info.desc}</p>
+                    <div className="w-full max-w-md bg-gray-100 p-6 rounded-xl">
+                        <input type="range" min="10" max="170" step="1" value={angle}
+                            onChange={(e) => { let val = parseInt(e.target.value); if (val > 85 && val < 95) val = 90; setAngle(val); }}
+                            className="w-full h-3 bg-gray-300 rounded-lg appearance-none cursor-pointer accent-indigo-600" />
+                    </div>
+                </div>
+            );
+        };
+
+        // Ruler Component
+        const Ruler = ({ p1, p2, cellSize, padding }) => {
+            const x1 = p1.c * cellSize + padding;
+            const y1 = p1.r * cellSize + padding;
+            const x2 = p2.c * cellSize + padding;
+            const y2 = p2.r * cellSize + padding;
+
+            const dx = x2 - x1;
+            const dy = y2 - y1;
+            const length = Math.sqrt(dx * dx + dy * dy);
+            const angleRad = Math.atan2(dy, dx);
+            const angleDeg = angleRad * 180 / Math.PI;
+            const rulerWidth = 40;
+
+            return (
+                <g transform={`translate(${x1}, ${y1}) rotate(${angleDeg}) translate(0, -${rulerWidth})`} className="animate-fade-in">
+                    <rect x="-20" y="0" width={length + 40} height={rulerWidth} fill="#facc15" stroke="#ca8a04" strokeWidth="2" rx="4" opacity="0.9" />
+                    {Array.from({ length: Math.floor((length + 40) / 15) }).map((_, i) => (
+                        <line key={i} x1={i * 15 - 15} y1={rulerWidth - (i % 5 === 0 ? 15 : 8)} x2={i * 15 - 15} y2={rulerWidth} stroke="#ca8a04" strokeWidth={i % 5 === 0 ? 2 : 1} />
+                    ))}
+                    <text x={(length)/2} y={rulerWidth/2 + 5} fill="#854d0e" fontSize="12" fontWeight="bold" textAnchor="middle" style={{transformBox: 'fill-box', transformOrigin: 'center', transform: 'rotate(180deg)'}}>直尺輔助</text>
+                </g>
+            );
+        };
+
+        // 2. Grid Drawer Mode
+        const GridDrawer = () => {
+            const [points, setPoints] = useState([]);
+            const [result, setResult] = useState(null);
+            const [activeRuler, setActiveRuler] = useState(null); 
+            const [targetTask, setTargetTask] = useState('直角'); 
+            const rulerTimeoutRef = useRef(null);
+
+            const gridSize = 10; 
+            const cellSize = 35; 
+            const svgPadding = 30; 
+            const boardSize = (gridSize) * cellSize + svgPadding * 2;
+
+            useEffect(() => {
+                generateNewTask();
+            }, []);
+
+            const generateNewTask = () => {
+                const tasks = ['銳角', '直角', '鈍角'];
+                const randomTask = tasks[Math.floor(Math.random() * tasks.length)];
+                setTargetTask(randomTask);
+                resetDrawing();
+            };
+
+            useEffect(() => {
+                if (rulerTimeoutRef.current) clearTimeout(rulerTimeoutRef.current);
+                
+                let newRuler = null;
+                if (points.length === 2) {
+                    newRuler = { p1: points[0], p2: points[1] };
+                } else if (points.length === 3) {
+                    newRuler = { p1: points[0], p2: points[2] };
+                }
+
+                if (newRuler) {
+                    setActiveRuler(newRuler);
+                    rulerTimeoutRef.current = setTimeout(() => {
+                        setActiveRuler(null);
+                    }, 1500);
+                } else {
+                    setActiveRuler(null);
+                }
+
+                if (points.length === 3) calculateAngle(points);
+                return () => { if (rulerTimeoutRef.current) clearTimeout(rulerTimeoutRef.current); };
+            }, [points]);
+
+            const handlePointClick = (r, c) => {
+                if (points.length >= 3) return;
+                if (points.some(p => p.r === r && p.c === c)) return;
+                setPoints([...points, { r, c }]);
+            };
+
+            const undoLastPoint = () => {
+                if (points.length > 0) {
+                    setPoints(points.slice(0, -1));
+                    setResult(null);
+                    setActiveRuler(null);
+                }
+            };
+
+            const calculateAngle = (pts) => {
+                const vertex = pts[0]; const p1 = pts[1]; const p2 = pts[2];
+                const v1 = { x: p1.c - vertex.c, y: -(p1.r - vertex.r) };
+                const v2 = { x: p2.c - vertex.c, y: -(p2.r - vertex.r) };
+                const dot = v1.x * v2.x + v1.y * v2.y;
+                const mag1 = Math.sqrt(v1.x*v1.x + v1.y*v1.y);
+                const mag2 = Math.sqrt(v2.x*v2.x + v2.y*v2.y);
+                const cosTheta = dot / (mag1 * mag2);
+                let deg = Math.acos(Math.max(-1, Math.min(1, cosTheta))) * 180 / Math.PI;
+                
+                let type = '', color = {};
+                if (Math.abs(deg - 90) < 1.5) { type = '直角'; color = COLORS.right; }
+                else if (deg < 90) { type = '銳角'; color = COLORS.acute; }
+                else { type = '鈍角'; color = COLORS.obtuse; }
+                
+                const isCorrect = type === targetTask;
+                setResult({ type, deg: Math.round(deg), color, isCorrect });
+            };
+
+            const resetDrawing = () => { setPoints([]); setResult(null); setActiveRuler(null); };
+
+            return (
+                <div className="flex flex-col items-center">
+                    {/* Task Header */}
+                    <div className="w-full flex flex-col md:flex-row justify-between items-center mb-6 bg-indigo-50 p-4 rounded-xl border border-indigo-100">
+                        <div className="flex items-center gap-3 mb-2 md:mb-0">
+                            <div className="bg-indigo-600 text-white p-2 rounded-lg">
+                                <PenTool className="w-6 h-6" />
+                            </div>
+                            <div className="text-left">
+                                <div className="text-xs font-bold text-indigo-400 uppercase tracking-wider">今日任務</div>
+                                <div className="text-xl md:text-2xl font-bold text-indigo-900 flex items-center gap-2">
+                                    請畫出一個
+                                    <span className={`px-2 py-0.5 rounded ${
+                                        targetTask === '直角' ? 'bg-orange-100 text-orange-600' :
+                                        targetTask === '銳角' ? 'bg-blue-100 text-blue-600' : 'bg-green-100 text-green-600'
+                                    }`}>
+                                        {targetTask}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex gap-2">
+                            <button onClick={undoLastPoint} disabled={points.length === 0 || !!result} className="flex items-center gap-2 bg-white hover:bg-gray-50 px-3 py-2 rounded-lg font-bold text-gray-600 border border-gray-200 transition disabled:opacity-50" title="上一步">
+                                <Undo2 className="w-4 h-4" />
+                                <span className="hidden md:inline">上一步</span>
+                            </button>
+                            <button onClick={resetDrawing} className="flex items-center gap-2 bg-white hover:bg-gray-50 px-4 py-2 rounded-lg font-bold text-gray-700 border border-gray-200 transition">
+                                <RotateCcw className="w-4 h-4" /> 重畫
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Info Bar */}
+                    <div className={`mb-4 px-4 py-3 rounded-lg border flex items-center gap-3 text-sm md:text-base transition-all duration-300 w-full max-w-md
+                        ${activeRuler ? 'bg-yellow-50 border-yellow-300 shadow-md' : 'bg-gray-50 border-gray-200'}`}>
+                        {activeRuler ? (
+                            <div className="flex items-center gap-2 text-yellow-800 animate-pulse">
+                                <RulerIcon className="w-5 h-5" />
+                                <span className="font-bold">直尺輔助連線中...</span>
+                            </div>
+                        ) : (
+                            <div className="flex items-center gap-2 text-gray-600">
+                                <Info className="w-5 h-5 flex-shrink-0 text-indigo-500" />
+                                <span className="font-bold">
+                                    {points.length === 0 && "步驟 1：點擊方格交點，定出「頂點」。"}
+                                    {points.length === 1 && "步驟 2：點擊另一點，畫出第一條邊。"}
+                                    {points.length === 2 && "步驟 3：點擊第三點，畫出第二條邊。"}
+                                    {points.length === 3 && "完成！系統正在檢查..."}
+                                </span>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="relative bg-white border-4 border-gray-300 rounded shadow-md cursor-crosshair select-none" 
+                        style={{ width: boardSize, height: boardSize }}>
+                        
+                        {/* Layer 0: Grid Lines */}
+                        <svg className="absolute top-0 left-0 w-full h-full pointer-events-none" style={{zIndex: 0}}>
+                            {Array.from({ length: gridSize + 1 }).map((_, i) => (
+                                <React.Fragment key={i}>
+                                    <line x1={svgPadding} y1={svgPadding + i * cellSize} x2={boardSize - svgPadding} y2={svgPadding + i * cellSize} stroke="#cbd5e1" strokeWidth="1.5" />
+                                    <line x1={svgPadding + i * cellSize} y1={svgPadding} x2={svgPadding + i * cellSize} y2={boardSize - svgPadding} stroke="#cbd5e1" strokeWidth="1.5" />
+                                </React.Fragment>
+                            ))}
+                        </svg>
+
+                        {/* Layer 1: Drawn Lines & Ruler */}
+                        <svg className="absolute top-0 left-0 w-full h-full pointer-events-none" style={{zIndex: 1}}>
+                            {points.length >= 2 && (
+                                <line x1={points[0].c * cellSize + svgPadding} y1={points[0].r * cellSize + svgPadding}
+                                        x2={points[1].c * cellSize + svgPadding} y2={points[1].r * cellSize + svgPadding}
+                                        stroke="#4b5563" strokeWidth="4" strokeLinecap="round" />
+                            )}
+                            {points.length === 3 && (
+                                <line x1={points[0].c * cellSize + svgPadding} y1={points[0].r * cellSize + svgPadding}
+                                        x2={points[2].c * cellSize + svgPadding} y2={points[2].r * cellSize + svgPadding}
+                                        stroke="#4b5563" strokeWidth="4" strokeLinecap="round" />
+                            )}
+                            {activeRuler && <Ruler p1={activeRuler.p1} p2={activeRuler.p2} cellSize={cellSize} padding={svgPadding} />}
+                        </svg>
+
+                        {/* Layer 2: Click Targets */}
+                        <div className="absolute top-0 left-0 w-full h-full z-20">
+                            {Array.from({ length: (gridSize + 1) }).map((_, r) => 
+                                Array.from({ length: (gridSize + 1) }).map((_, c) => {
+                                    const cx = c * cellSize + svgPadding;
+                                    const cy = r * cellSize + svgPadding;
+                                    const index = points.findIndex(p => p.r === r && p.c === c);
+                                    const isSelected = index !== -1;
+                                    const isVertex = index === 0;
+                                    
+                                    return (
+                                        <div key={`${r}-${c}`}
+                                            onClick={() => handlePointClick(r, c)}
+                                            className="absolute flex items-center justify-center cursor-pointer group"
+                                            style={{ left: cx - 15, top: cy - 15, width: 30, height: 30 }}>
+                                            <div className={`rounded-full transition-all duration-200
+                                                ${isSelected 
+                                                    ? (isVertex ? 'bg-red-500 w-4 h-4 ring-4 ring-red-100' : 'bg-indigo-600 w-3 h-3 ring-2 ring-indigo-100') 
+                                                    : 'w-2 h-2 bg-gray-400 opacity-0 group-hover:opacity-50'}`} 
+                                            />
+                                        </div>
+                                    );
+                                })
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Result Display */}
+                    {result && (
+                        <div className={`mt-6 p-6 rounded-xl border-2 flex flex-col items-center gap-4 animate-bounce-short shadow-lg max-w-md w-full
+                        ${result.isCorrect ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+                        
+                        <div className="flex items-center gap-3">
+                            {result.isCorrect ? <CheckCircle className="w-10 h-10 text-green-500" /> : <XCircle className="w-10 h-10 text-red-500" />}
+                            <div className="text-left">
+                                <div className={`text-2xl font-bold ${result.isCorrect ? 'text-green-700' : 'text-red-700'}`}>
+                                    {result.isCorrect ? '太棒了！答對了！' : '哎呀，不對喔...'}
+                                </div>
+                                <div className="text-gray-600 text-sm">
+                                    你畫的是 <span className={`font-bold ${result.color.main}`}>{result.type} ({result.deg}°)</span>
+                                    {!result.isCorrect && <span>，但題目要的是 <b>{targetTask}</b>。</span>}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex gap-3 w-full mt-2">
+                            {!result.isCorrect && (
+                                <button onClick={resetDrawing} className="flex-1 bg-white border border-gray-300 text-gray-700 py-3 rounded-lg font-bold hover:bg-gray-50 transition">
+                                    再試一次
+                                </button>
+                            )}
+                            {result.isCorrect && (
+                                <button onClick={generateNewTask} className="flex-1 bg-indigo-600 text-white py-3 rounded-lg font-bold hover:bg-indigo-700 shadow-lg flex justify-center items-center gap-2 transition transform hover:scale-105">
+                                    下一題 <ArrowRight className="w-5 h-5" />
+                                </button>
+                            )}
+                        </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        // 3. Quiz Mode
+        const AngleQuiz = () => {
+            const [currentQuestion, setCurrentQuestion] = useState(null);
+            const [score, setScore] = useState(0);
+            const [feedback, setFeedback] = useState(null);
+
+            // Initialize question
+            useEffect(() => {
+                setCurrentQuestion(generateQuestion());
+            }, []);
+
+            function generateQuestion() {
+                const type = Math.floor(Math.random() * 3);
+                let angle, typeName;
+                if (type === 0) { angle = Math.floor(Math.random() * 60) + 20; typeName = '銳角'; } 
+                else if (type === 1) { angle = 90; typeName = '直角'; } 
+                else { angle = Math.floor(Math.random() * 50) + 110; typeName = '鈍角'; }
+                return { angle, typeName, rotation: Math.floor(Math.random() * 360) };
+            }
+
+            const handleAnswer = (selectedType) => {
+                if (feedback) return;
+                if (selectedType === currentQuestion.typeName) { setFeedback('correct'); setScore(score + 10); } 
+                else { setFeedback('wrong'); }
+            };
+            const nextQuestion = () => { setFeedback(null); setCurrentQuestion(generateQuestion()); };
+
+            if (!currentQuestion) return <div>Loading...</div>;
+
+            const radius = 80; const cx = 100; const cy = 100;
+            const rad = (currentQuestion.angle * Math.PI) / 180;
+            const x1 = cx + radius; const y1 = cy;
+            const x2 = cx + radius * Math.cos(-rad); const y2 = cy + radius * Math.sin(-rad);
+
+            return (
+                <div className="flex flex-col items-center w-full">
+                    <div className="flex justify-between w-full items-center mb-8 px-4">
+                        <h2 className="text-2xl font-bold text-gray-700">這是哪一種角？</h2>
+                        <div className="bg-indigo-100 text-indigo-700 px-4 py-2 rounded-lg font-bold flex items-center gap-2"><Trophy className="w-5 h-5" /> 分數: {score}</div>
+                    </div>
+                    <div className="mb-8 p-8 bg-white border-2 border-gray-100 shadow-lg rounded-2xl flex justify-center items-center">
+                        <svg width="200" height="200" style={{ transform: `rotate(${currentQuestion.rotation}deg)` }} className="overflow-visible">
+                            <line x1={cx} y1={cy} x2={x1} y2={y1} stroke="black" strokeWidth="5" strokeLinecap="round" />
+                            <line x1={cx} y1={cy} x2={x2} y2={y2} stroke="black" strokeWidth="5" strokeLinecap="round" />
+                            <circle cx={cx} cy={cy} r="6" fill="#4b5563" />
+                            <path d={`M ${cx + 30} ${cy} A 30 30 0 0 0 ${cx + 30 * Math.cos(-rad)} ${cy + 30 * Math.sin(-rad)}`}
+                                fill="none" stroke="#9ca3af" strokeWidth="2" strokeDasharray="4,2" />
+                        </svg>
+                    </div>
+                    <div className="grid grid-cols-3 gap-4 w-full max-w-lg mb-6">
+                        {['銳角', '直角', '鈍角'].map((type) => (
+                            <button key={type} onClick={() => handleAnswer(type)} disabled={!!feedback}
+                                className={`py-4 rounded-xl text-xl font-bold transition-all shadow-sm border-b-4 ${feedback ? (type === currentQuestion.typeName ? 'bg-green-500 text-white border-green-700 scale-105' : (feedback === 'wrong' && type !== currentQuestion.typeName ? 'opacity-50 bg-gray-200' : 'bg-white border-gray-200 text-gray-400')) : 'bg-white hover:bg-indigo-50 border-indigo-200 text-indigo-600 hover:scale-105 active:scale-95'}`}>{type}</button>
+                        ))}
+                    </div>
+                    {feedback && (
+                        <div className="flex flex-col items-center animate-fade-in-up">
+                            <div className={`text-2xl font-bold mb-4 flex items-center gap-2 ${feedback === 'correct' ? 'text-green-600' : 'text-red-500'}`}>
+                                {feedback === 'correct' ? <><CheckCircle className="w-8 h-8" /> 答對了！</> : <><XCircle className="w-8 h-8" /> 答錯了，這是{currentQuestion.typeName}喔！</>}
+                            </div>
+                            <button onClick={nextQuestion} className="bg-indigo-600 text-white px-8 py-3 rounded-full font-bold text-lg hover:bg-indigo-700 shadow-lg transition transform hover:scale-105">下一題 <Play className="inline w-5 h-5 ml-1 fill-current" /></button>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
