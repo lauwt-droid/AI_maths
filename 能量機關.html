@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>能量機關模擬器 (RoboMaster Rules)</title>
+    <!-- 載入 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Inter:wght@400;700&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #1a202c; /* 深色背景，更有科技感 */
+            color: white;
+        }
+
+        /* 數字字體使用等寬字體，更有電子顯示屏的感覺 */
+        .tech-font {
+            font-family: 'Share Tech Mono', monospace;
+        }
+
+        .board {
+            width: 100%;
+            padding-top: 100%;
+            position: relative;
+            background-color: #2d3748;
+            border: 4px solid #4a5568;
+            box-shadow: 0 0 15px rgba(66, 153, 225, 0.1);
+            transition: all 0.2s ease-in-out;
+            cursor: pointer;
+            user-select: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 3.5rem;
+            font-weight: bold;
+            color: #63b3ed; /* 科技藍 */
+            border-radius: 0.5rem;
+        }
+
+        .board-content {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* 擊中後的狀態 */
+        .board-hit {
+            background-color: #2f855a; /* 綠色背景 */
+            color: #ffffff;
+            border-color: #48bb78;
+            box-shadow: 0 0 20px rgba(72, 187, 120, 0.6);
+        }
+
+        /* 失敗閃爍動畫 */
+        .flash-error {
+            animation: flashRed 0.5s ease-in-out;
+        }
+        @keyframes flashRed {
+            0%, 100% { background-color: #2d3748; }
+            50% { background-color: #e53e3e; }
+        }
+
+        /* 成功動畫 */
+        .success-overlay {
+            animation: scaleIn 0.3s ease-out;
+        }
+        @keyframes scaleIn {
+            0% { transform: scale(0.8); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        /* 進度條 */
+        .progress-bar {
+            transition: width 0.1s linear;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-start p-4 pt-8">
+
+    <!-- 頂部資訊列：比賽時間與狀態 -->
+    <div class="w-full max-w-2xl flex justify-between items-end mb-6 border-b border-gray-700 pb-4">
+        <div>
+            <div class="text-gray-400 text-sm mb-1">比賽倒計時</div>
+            <div id="match-timer" class="text-5xl font-bold tech-font text-white">05:00</div>
+        </div>
+        <div class="text-right">
+            <div class="text-gray-400 text-sm mb-1">機關狀態</div>
+            <div id="status-badge" class="px-3 py-1 rounded bg-blue-600 text-white text-sm font-bold inline-block">
+                初始化
+            </div>
+        </div>
+    </div>
+
+    <!-- 訊息提示 -->
+    <div id="message-box" class="h-8 mb-4 text-center text-yellow-400 font-mono text-lg">
+        等待比賽開始...
+    </div>
+
+    <!-- 遊戲主區域 (包含板塊與覆蓋層) -->
+    <div class="relative w-full max-w-2xl">
+        
+        <!-- 板塊容器 -->
+        <div id="boards-container" class="grid grid-cols-5 gap-3 sm:gap-4 w-full transition-opacity duration-500">
+            <!-- JS 生成 -->
+        </div>
+
+        <!-- 成功狀態覆蓋層 (ATK) -->
+        <div id="success-overlay" class="hidden absolute inset-0 bg-gray-900 bg-opacity-90 flex-col items-center justify-center z-20 rounded-lg border-2 border-green-500 success-overlay">
+            <span class="text-9xl font-bold text-green-500 tech-font tracking-tighter" style="text-shadow: 0 0 30px rgba(72,187,120,0.8);">ATK</span>
+            <div class="mt-4 text-green-300 tech-font">BUFF ACTIVE</div>
+        </div>
+
+        <!-- 冷卻狀態覆蓋層 -->
+        <div id="cooldown-overlay" class="hidden absolute inset-0 bg-gray-800 bg-opacity-95 flex-col items-center justify-center z-20 rounded-lg border-2 border-gray-600">
+            <div class="text-gray-400 text-xl mb-2 font-bold tracking-widest">COOLDOWN</div>
+            <span id="cooldown-timer" class="text-8xl font-bold text-blue-400 tech-font">50.0</span>
+            <div class="mt-8 w-64 h-2 bg-gray-700 rounded-full overflow-hidden">
+                <div id="cooldown-bar" class="h-full bg-blue-500 progress-bar" style="width: 100%"></div>
+            </div>
+        </div>
+        
+    </div>
+
+    <!-- 2秒超時進度條 (僅在 Activating 狀態顯示) -->
+    <div id="timeout-bar-container" class="w-full max-w-2xl h-2 bg-gray-700 mt-6 rounded-full overflow-hidden opacity-0 transition-opacity duration-300">
+        <div id="timeout-bar" class="h-full bg-red-500 w-full"></div>
+    </div>
+
+    <!-- 控制區 -->
+    <div class="mt-10 flex gap-4">
+        <button id="start-match-btn" class="px-6 py-2 bg-green-600 hover:bg-green-700 rounded text-white font-bold transition">
+            開始比賽
+        </button>
+        <button onclick="debugJumpTime()" class="px-6 py-2 bg-gray-600 hover:bg-gray-700 rounded text-white font-bold transition border border-gray-500">
+            [測試] 跳至 2:59
+        </button>
+    </div>
+
+    <script>
+        // --- 常數定義 ---
+        const REFRESH_INTERVAL = 8000; // 8秒自動刷新 (可啟動狀態)
+        const INPUT_TIMEOUT = 2000;    // 2秒輸入超時 (正在啟動狀態)
+        const SUCCESS_DURATION = 10000;// 10秒成功持續時間
+        const COOLDOWN_DURATION = 50000;// 50秒冷卻時間
+        const MATCH_DURATION = 300;    // 5分鐘 (300秒)
+        const ACTIVATION_ALLOWED_TIME = 179; // 倒數至 2:59 (即 179秒) 以下才算成功
+
+        // 狀態列舉
+        const STATES = {
+            IDLE: 'IDLE',             // 比賽未開始
+            AVAILABLE: 'AVAILABLE',   // 可啟動 (隨機跳動)
+            ACTIVATING: 'ACTIVATING', // 正在啟動 (擊打中)
+            SUCCESS: 'SUCCESS',       // 啟動成功 (ATK)
+            COOLDOWN: 'COOLDOWN'      // 冷卻中
+        };
+
+        // --- 遊戲狀態 ---
+        let gameState = {
+            status: STATES.IDLE,
+            matchTimeRemaining: MATCH_DURATION,
+            boards: [],           // 當前數字
+            sequence: [],         // 正確順序
+            hitCount: 0,          // 當前已擊中數量
+            
+            // 計時器參照
+            matchTimerId: null,      // 比賽總倒數
+            refreshTimerId: null,    // 8秒刷新
+            inputTimerId: null,      // 2秒超時
+            cooldownTimerId: null,   // 冷卻/成功狀態計時
+            lastFrameTime: 0         // 用於動畫幀計算
+        };
+
+        // DOM 元素
+        const els = {
+            matchTimer: document.getElementById('match-timer'),
+            statusBadge: document.getElementById('status-badge'),
+            message: document.getElementById('message-box'),
+            boardsContainer: document.getElementById('boards-container'),
+            successOverlay: document.getElementById('success-overlay'),
+            cooldownOverlay: document.getElementById('cooldown-overlay'),
+            cooldownText: document.getElementById('cooldown-timer'),
+            cooldownBar: document.getElementById('cooldown-bar'),
+            timeoutBarContainer: document.getElementById('timeout-bar-container'),
+            timeoutBar: document.getElementById('timeout-bar'),
+            startBtn: document.getElementById('start-match-btn')
+        };
+
+        // --- 核心邏輯 ---
+
+        function init() {
+            renderBoards([0,0,0,0,0], false); // 初始顯示空白板
+            updateStatusDisplay();
+        }
+
+        // 開始比賽
+        els.startBtn.addEventListener('click', () => {
+            if (gameState.matchTimerId) clearInterval(gameState.matchTimerId);
+            resetGame(true);
+            els.startBtn.textContent = "重置比賽";
+            els.startBtn.classList.replace('bg-green-600', 'bg-red-600');
+            els.startBtn.classList.replace('hover:bg-green-700', 'hover:bg-red-700');
+        });
+
+        // 測試功能：跳轉時間
+        window.debugJumpTime = function() {
+            if (gameState.status === STATES.IDLE) {
+                alert("請先開始比賽！");
+                return;
+            }
+            gameState.matchTimeRemaining = 185; // 跳到 3:05，準備測試
+            updateMatchTimerDisplay();
+            showMessage("已跳轉至 3:05，請準備在 2:59 後啟動！");
+        };
+
+        function resetGame(fullReset = false) {
+            // 清除所有計時器
+            clearInterval(gameState.refreshTimerId);
+            clearInterval(gameState.inputTimerId);
+            clearInterval(gameState.cooldownTimerId);
+            cancelAnimationFrame(gameState.inputAnimFrame);
+
+            // 隱藏所有 Overlay
+            els.successOverlay.classList.add('hidden');
+            els.cooldownOverlay.classList.add('hidden');
+            els.timeoutBarContainer.classList.add('opacity-0');
+
+            if (fullReset) {
+                // 完全重置 (新比賽)
+                gameState.matchTimeRemaining = MATCH_DURATION;
+                startMatchTimer();
+            }
+
+            // 進入可啟動狀態
+            enterAvailableState();
+        }
+
+        function startMatchTimer() {
+            updateMatchTimerDisplay();
+            gameState.matchTimerId = setInterval(() => {
+                gameState.matchTimeRemaining--;
+                updateMatchTimerDisplay();
+
+                if (gameState.matchTimeRemaining <= 0) {
+                    endMatch();
+                }
+            }, 1000);
+        }
+
+        function endMatch() {
+            clearInterval(gameState.matchTimerId);
+            clearInterval(gameState.refreshTimerId);
+            clearInterval(gameState.inputTimerId);
+            clearInterval(gameState.cooldownTimerId);
+            gameState.status = STATES.IDLE;
+            showMessage("比賽結束！");
+            updateStatusDisplay();
+        }
+
+        // --- 狀態：可啟動 (Available) ---
+        function enterAvailableState() {
+            gameState.status = STATES.AVAILABLE;
+            updateStatusDisplay();
+            
+            // 立即生成一次
+            refreshNumbers();
+
+            // 啟動 8 秒自動刷新
+            gameState.refreshTimerId = setInterval(() => {
+                refreshNumbers();
+                showMessage("數字已刷新 (8秒週期)");
+            }, REFRESH_INTERVAL);
+        }
+
+        function refreshNumbers() {
+            const nums = generateUniqueNumbers();
+            gameState.boards = nums;
+            gameState.sequence = [...nums].sort((a, b) => a - b);
+            gameState.hitCount = 0;
+            renderBoards(nums);
+            showMessage("能量機關：可啟動");
+        }
+
+        // --- 狀態：正在啟動 (Activating) ---
+        function enterActivatingState(firstHitIndex) {
+            // 停止 8 秒刷新
+            clearInterval(gameState.refreshTimerId);
+            
+            gameState.status = STATES.ACTIVATING;
+            gameState.hitCount = 1; // 已經擊中第一個
+            
+            // 更新板塊顯示 (第一個變成 O)
+            updateBoardVisuals();
+
+            // 顯示 2秒 倒數條
+            els.timeoutBarContainer.classList.remove('opacity-0');
+            
+            updateStatusDisplay();
+            showMessage(`正在啟動... (剩餘 ${5 - gameState.hitCount} 個)`);
+
+            // 啟動 2秒 超時機制
+            startInputTimeout();
+        }
+
+        function handleHit(index) {
+            if (gameState.status === STATES.AVAILABLE) {
+                const clickedVal = gameState.boards[index];
+                const expectedVal = gameState.sequence[0];
+
+                if (clickedVal === expectedVal) {
+                    // 擊中第一個，進入 Activating
+                    gameState.boards[index] = 'O'; // 標記為擊中
+                    enterActivatingState(index);
+                } else {
+                    // 在可啟動狀態亂點，沒反應或閃爍錯誤
+                    flashBoardError(index);
+                }
+            } 
+            else if (gameState.status === STATES.ACTIVATING) {
+                const clickedVal = gameState.boards[index];
+                // 找出下一個目標值
+                const expectedVal = gameState.sequence[gameState.hitCount];
+
+                // 檢查是否點擊已經變成 'O' 的板塊
+                if (clickedVal === 'O') return;
+
+                if (clickedVal === expectedVal) {
+                    // 擊中正確
+                    gameState.boards[index] = 'O';
+                    gameState.hitCount++;
+                    updateBoardVisuals();
+
+                    if (gameState.hitCount === 5) {
+                        // 全部擊中
+                        handleSequenceComplete();
+                    } else {
+                        // 繼續下一個，重置 2秒 計時
+                        startInputTimeout();
+                    }
+                } else {
+                    // 擊中錯誤 -> 啟動失敗
+                    handleActivationFailure("擊打錯誤");
+                }
+            }
+        }
+
+        function startInputTimeout() {
+            // 清除舊的計時器
+            clearInterval(gameState.inputTimerId);
+            cancelAnimationFrame(gameState.inputAnimFrame);
+
+            const startTime = Date.now();
+            
+            // UI 動畫：更新紅色進度條
+            const updateBar = () => {
+                const elapsed = Date.now() - startTime;
+                const progress = Math.max(0, 100 - (elapsed / INPUT_TIMEOUT * 100));
+                els.timeoutBar.style.width = `${progress}%`;
+
+                if (elapsed < INPUT_TIMEOUT && gameState.status === STATES.ACTIVATING) {
+                    gameState.inputAnimFrame = requestAnimationFrame(updateBar);
+                }
+            };
+            gameState.inputAnimFrame = requestAnimationFrame(updateBar);
+
+            // 邏輯計時
+            gameState.inputTimerId = setTimeout(() => {
+                handleActivationFailure("超時 (2秒)");
+            }, INPUT_TIMEOUT);
+        }
+
+        function handleActivationFailure(reason) {
+            gameState.status = STATES.AVAILABLE; // 暫時切回以免重複觸發
+            showMessage(`啟動失敗: ${reason}。重置中...`);
+            
+            // 視覺效果：閃爍所有板塊
+            const boards = document.querySelectorAll('.board');
+            boards.forEach(b => b.classList.add('flash-error'));
+
+            setTimeout(() => {
+                boards.forEach(b => b.classList.remove('flash-error'));
+                resetGame(false); // 重置回 Available
+            }, 500);
+        }
+
+        function handleSequenceComplete() {
+            // 停止 2秒 計時
+            clearInterval(gameState.inputTimerId);
+            cancelAnimationFrame(gameState.inputAnimFrame);
+            els.timeoutBarContainer.classList.add('opacity-0');
+
+            // 檢查比賽時間是否符合 "2分鐘後" (即倒計時 <= 2:59 / 179秒)
+            if (gameState.matchTimeRemaining <= ACTIVATION_ALLOWED_TIME) {
+                enterSuccessState();
+            } else {
+                // 雖然打對了，但時間未到
+                handleActivationFailure("時間未到 (需在 2:59 後)");
+            }
+        }
+
+        // --- 狀態：啟動成功 (Success) ---
+        function enterSuccessState() {
+            gameState.status = STATES.SUCCESS;
+            updateStatusDisplay();
+            
+            // 顯示 ATK
+            els.successOverlay.classList.remove('hidden');
+            
+            // 10秒後進入冷卻
+            let timeLeft = SUCCESS_DURATION / 1000;
+            showMessage(`啟動成功！ATK 持續 10 秒...`);
+
+            gameState.cooldownTimerId = setTimeout(() => {
+                enterCooldownState();
+            }, SUCCESS_DURATION);
+        }
+
+        // --- 狀態：冷卻 (Cooldown) ---
+        function enterCooldownState() {
+            gameState.status = STATES.COOLDOWN;
+            updateStatusDisplay();
+            
+            els.successOverlay.classList.add('hidden');
+            els.cooldownOverlay.classList.remove('hidden');
+            
+            // 50秒倒數 (精確到 0.1)
+            let remaining = COOLDOWN_DURATION;
+            const startTime = Date.now();
+
+            gameState.cooldownTimerId = setInterval(() => {
+                const elapsed = Date.now() - startTime;
+                remaining = Math.max(0, COOLDOWN_DURATION - elapsed);
+                
+                // 更新 UI
+                els.cooldownText.textContent = (remaining / 1000).toFixed(1);
+                const pct = (remaining / COOLDOWN_DURATION) * 100;
+                els.cooldownBar.style.width = `${pct}%`;
+
+                if (remaining <= 0) {
+                    clearInterval(gameState.cooldownTimerId);
+                    // 冷卻結束，回到可啟動
+                    resetGame(false);
+                }
+            }, 50); // 每 50ms 更新一次 UI
+        }
+
+
+        // --- 輔助函式 ---
+
+        function generateUniqueNumbers() {
+            let arr = [1,2,3,4,5,6,7,8,9];
+            for(let i = arr.length - 1; i > 0; i--){
+                const j = Math.floor(Math.random() * (i + 1));
+                [arr[i], arr[j]] = [arr[j], arr[i]];
+            }
+            return arr.slice(0, 5);
+        }
+
+        function renderBoards(data, interactive = true) {
+            els.boardsContainer.innerHTML = '';
+            data.forEach((val, idx) => {
+                const el = document.createElement('div');
+                el.className = 'board tech-font';
+                
+                if (val === 'O') {
+                    el.classList.add('board-hit');
+                    el.innerHTML = `<div class="board-content text-5xl">O</div>`;
+                } else {
+                    el.innerHTML = `<div class="board-content">${val === 0 ? '' : val}</div>`;
+                }
+
+                if (interactive && val !== 'O' && gameState.status !== STATES.SUCCESS && gameState.status !== STATES.COOLDOWN) {
+                    el.onclick = () => handleHit(idx);
+                } else {
+                    el.style.cursor = 'default';
+                }
+
+                els.boardsContainer.appendChild(el);
+            });
+        }
+
+        function updateBoardVisuals() {
+            // 只更新內容和樣式，不完全重建 DOM 以保持動畫順暢
+            renderBoards(gameState.boards);
+        }
+
+        function flashBoardError(index) {
+            const children = els.boardsContainer.children;
+            if (children[index]) {
+                children[index].classList.add('flash-error');
+                setTimeout(() => children[index].classList.remove('flash-error'), 500);
+            }
+        }
+
+        function updateMatchTimerDisplay() {
+            const m = Math.floor(gameState.matchTimeRemaining / 60);
+            const s = gameState.matchTimeRemaining % 60;
+            els.matchTimer.textContent = `${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
+            
+            // 改變顏色提示
+            if (gameState.matchTimeRemaining <= ACTIVATION_ALLOWED_TIME) {
+                els.matchTimer.classList.remove('text-white');
+                els.matchTimer.classList.add('text-green-400'); // 可以打了
+            } else {
+                els.matchTimer.classList.add('text-white');
+                els.matchTimer.classList.remove('text-green-400');
+            }
+        }
+
+        function updateStatusDisplay() {
+            let text = "";
+            let colorClass = "";
+            
+            switch(gameState.status) {
+                case STATES.IDLE: 
+                    text = "等待開始"; colorClass = "bg-gray-600"; break;
+                case STATES.AVAILABLE: 
+                    text = "可啟動"; colorClass = "bg-blue-600"; break;
+                case STATES.ACTIVATING: 
+                    text = "正在啟動"; colorClass = "bg-yellow-600"; break;
+                case STATES.SUCCESS: 
+                    text = "啟動成功"; colorClass = "bg-green-600"; break;
+                case STATES.COOLDOWN: 
+                    text = "冷卻中"; colorClass = "bg-gray-500"; break;
+            }
+            els.statusBadge.textContent = text;
+            els.statusBadge.className = `px-3 py-1 rounded text-white text-sm font-bold inline-block ${colorClass}`;
+        }
+
+        function showMessage(msg) {
+            els.message.textContent = msg;
+        }
+
+        // 初始化
+        init();
+
+    </script>
+</body>
+</html>
