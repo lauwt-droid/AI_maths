@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎄 聖誕表演出場次序抽籤 🎁</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap');
+        
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            background: #0d4a22;
+            background-image: radial-gradient(circle at 50% 50%, #1a6d34 0%, #0d4a22 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow-x: hidden;
+            margin: 0;
+        }
+
+        /* 雪花動畫 */
+        .snowflake {
+            color: #fff;
+            position: fixed;
+            top: -10%;
+            z-index: 0;
+            user-select: none;
+            animation: fall linear infinite;
+        }
+
+        @keyframes fall {
+            0% { top: -10%; transform: translateX(0) rotate(0deg); }
+            100% { top: 110%; transform: translateX(50px) rotate(360deg); }
+        }
+
+        .christmas-card {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 30px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
+            position: relative;
+            z-index: 10;
+            border-top: 15px solid #c41e3a;
+        }
+
+        .list-item {
+            transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            transform: translateY(30px);
+            opacity: 0;
+        }
+
+        .list-item.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        .btn-christmas {
+            background: #c41e3a;
+            box-shadow: 0 4px 0 #8a1529;
+            transition: all 0.2s;
+        }
+
+        .btn-christmas:active {
+            box-shadow: 0 0px 0 #8a1529;
+            transform: translateY(4px);
+        }
+
+        /* 網格佈局優化 */
+        .result-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 16px;
+            width: 100%;
+        }
+
+        .order-circle {
+            background: #c41e3a;
+            box-shadow: 0 2px 4px rgba(196, 30, 58, 0.3);
+        }
+    </style>
+</head>
+<body class="p-4">
+
+    <div id="snow-container"></div>
+
+    <div class="christmas-card w-full max-w-5xl p-8">
+        <header class="text-center mb-10">
+            <div class="text-4xl mb-2">🎅</div>
+            <h1 class="text-3xl font-black text-red-700 tracking-wider mb-2">聖誕出場次序抽籤</h1>
+            <div class="h-1.5 w-24 bg-red-600 mx-auto rounded-full"></div>
+        </header>
+
+        <div class="flex flex-col items-center">
+            <!-- 操作按鈕 -->
+            <button id="drawBtn" onclick="startDraw()" class="btn-christmas mb-12 text-white font-bold py-5 px-12 rounded-full flex items-center gap-3 text-2xl hover:bg-red-700 transition-colors shadow-lg">
+                <span>🎁</span> 開始抽籤
+            </button>
+
+            <!-- 結果顯示區域 (橫向網格) -->
+            <div id="resultContainer" class="result-grid w-full min-h-[180px]">
+                <div class="col-span-full text-center py-10 text-gray-400 font-medium italic text-lg">
+                    準備好了嗎？點擊按鈕即時開獎！
+                </div>
+            </div>
+        </div>
+
+        <footer class="mt-12 pt-6 border-t border-gray-100 text-center text-xs font-bold text-gray-400 uppercase tracking-widest">
+            Merry Christmas • Classroom Lottery System
+        </footer>
+    </div>
+
+    <script>
+        // 建立雪花背景
+        function createSnow() {
+            const container = document.getElementById('snow-container');
+            const snowflakes = ['❄', '❅', '❆'];
+            for (let i = 0; i < 40; i++) {
+                const flake = document.createElement('div');
+                flake.className = 'snowflake';
+                flake.innerHTML = snowflakes[Math.floor(Math.random() * snowflakes.length)];
+                flake.style.left = Math.random() * 100 + 'vw';
+                flake.style.animationDuration = (Math.random() * 5 + 5) + 's';
+                flake.style.opacity = Math.random() * 0.7;
+                flake.style.fontSize = (Math.random() * 15 + 10) + 'px';
+                container.appendChild(flake);
+            }
+        }
+        createSnow();
+
+        const classes = ["1A", "2A", "3A", "4A", "5A", "5B", "6A"];
+        const btn = document.getElementById('drawBtn');
+        const container = document.getElementById('resultContainer');
+
+        function startDraw() {
+            btn.disabled = true;
+            btn.innerHTML = "<span>🔔</span> 正在洗牌中...";
+            
+            container.innerHTML = `<div class="col-span-full text-center py-10 text-red-600 font-bold text-xl animate-pulse">正在為班級安排聖誕驚喜...</div>`;
+
+            setTimeout(() => {
+                const shuffled = shuffle([...classes]);
+                displayResults(shuffled);
+                btn.disabled = false;
+                btn.innerHTML = "<span>🔄</span> 重新抽籤";
+            }, 1000);
+        }
+
+        function shuffle(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+
+        function displayResults(results) {
+            container.innerHTML = '';
+            
+            results.forEach((name, index) => {
+                const delay = index * 100;
+                const item = document.createElement('div');
+                
+                // 強化版橫向卡片：突出顯示次序數字
+                item.className = 'list-item flex flex-col items-center justify-center p-8 bg-white border-2 border-red-50 rounded-3xl shadow-sm relative overflow-visible hover:border-red-500 hover:shadow-xl group transition-all duration-300';
+                
+                item.innerHTML = `
+                    <!-- 放大顯示的次序數字 -->
+                    <div class="order-circle absolute -top-4 -left-2 w-10 h-10 text-white rounded-full flex items-center justify-center font-black text-lg shadow-md z-20">
+                        ${index + 1}
+                    </div>
+                    
+                    <div class="text-[12px] font-bold text-red-500 uppercase tracking-widest mb-1">次序</div>
+                    <div class="text-5xl font-black text-red-700 mb-2 group-hover:scale-110 transition-transform">
+                        ${index + 1}
+                    </div>
+                    
+                    <div class="h-px w-8 bg-gray-200 mb-3"></div>
+                    
+                    <div class="text-3xl font-bold text-gray-800">
+                        ${name}
+                    </div>
+                `;
+                
+                container.appendChild(item);
+                
+                setTimeout(() => {
+                    item.classList.add('show');
+                }, delay);
+            });
+        }
+    </script>
+</body>
+</html>
